@@ -11,6 +11,8 @@ import scrapy
 import json
 import os
 
+from ..items import BooksToscrapeProduct
+from ..itemloaders import BookLoader
 
 class BooksByCategoriesSpider(scrapy.Spider):
     """
@@ -20,7 +22,7 @@ class BooksByCategoriesSpider(scrapy.Spider):
     au lieu de re-scrapper les catégories, puis visite chaque page
     de catégorie pour extraire tous les livres.
     """
-    name = "books_by_categories"
+    name = "books_by_categories_spider"
     allowed_domains = ["books.toscrape.com"]
 
     def start_requests(self):
@@ -53,12 +55,12 @@ class BooksByCategoriesSpider(scrapy.Spider):
 
             # Pour chaque catégorie, crée une requête
             for categorie in categories:
-                nom_categorie = categorie.get('nom', 'Inconnue')
-                url_complete = categorie.get('url_complete')
+                nom_categorie = categorie.get('name', 'Inconnue')
+                url = categorie.get('url')
 
-                if url_complete:
+                if url:
                     yield scrapy.Request(
-                        url=url_complete,
+                        url=url,
                         callback=self.parse_category,
                         meta={'nom_categorie': nom_categorie}
                     )
@@ -89,16 +91,19 @@ class BooksByCategoriesSpider(scrapy.Spider):
         livres = response.css("article.product_pod")
 
         for livre in livres:
-            # Extrait les données de chaque livre
-            yield {
-                'categorie': nom_categorie,
-                'titre': livre.css("h3 a::attr(title)").get(),
-                'prix': livre.css("p.price_color::text").get(),
-                'note_etoiles': livre.css("p.star-rating").attrib["class"].split()[-1],
-                'url_image': response.urljoin(livre.css("div.image_container a img::attr(src)").get()),
-                'url_livre': response.urljoin(livre.css("h3 a::attr(href)").get()),
-                'disponibilite': self.extraire_disponibilite(livre)
-            }
+            # Utilise le BookLoader pour traiter les données
+            loader = BookLoader(item=BooksToscrapeProduct(), selector=livre)
+
+            # Extrait les données avec les processeurs automatiques
+            loader.add_value('category', nom_categorie)
+            loader.add_css('title', "h3 a::attr(title)")
+            loader.add_css('price', "p.price_color::text")
+            loader.add_css('star_rating', "p.star-rating::attr(class)")
+            loader.add_css('image_url', "div.image_container a img::attr(src)")
+            loader.add_css('url', "h3 a::attr(href)")
+            loader.add_value('availability', self.extraire_disponibilite(livre))
+
+            yield loader.load_item()
 
         # Gestion de la pagination dans chaque catégorie
         # Cherche le lien "suivant" pour continuer dans la même catégorie

@@ -72,6 +72,7 @@ scrapy settings --get=BOT_NAME
 - `books_toscrape/spiders/books_spider.py` : Spider principal qui extrait les données des livres
 - `books_toscrape/spiders/categories_spider.py` : Spider pour extraire les catégories de livres
 - `books_toscrape/spiders/books_by_categories_spider.py` : Spider pour extraire les livres organisés par catégorie
+- `books_toscrape/spiders/details_book_spider.py` : Spider pour extraire les détails complets de chaque livre
 - `requirements.txt` : Liste des dépendances Python
 
 ## Fonctionnalités du Spider
@@ -222,7 +223,15 @@ scrapy crawl books_by_categories -o books_by_categories.csv
 ```bash
 # Commande complète : catégories + livres par catégorie en une fois
 cd books_toscrape
-scrapy crawl categories_spider -o categories.json && scrapy crawl books_by_categories -o books_by_categories.json
+scrapy crawl categories_spider -o categories.json && scrapy crawl books_by_categories_spider -o books_by_categories.json
+```
+
+### Écrasement des fichiers existants
+
+```bash
+# Pour écraser un fichier existant au lieu de l'ajouter (utiliser -O majuscule)
+cd books_toscrape
+scrapy crawl books_by_categories_spider -O books_by_categories.json
 ```
 
 ### Données extraites par books_by_categories
@@ -264,4 +273,168 @@ scrapy shell "https://books.toscrape.com/catalogue/category/books/mystery_3/inde
   "url": "https://books.toscrape.com/catalogue/sharp-objects_997/index.html",
   "availability": "In stock (20 available)"
 }
+```
+
+## Spider des Détails de Livres
+
+Le spider `details_book` extrait les informations complètes de chaque livre en visitant individuellement chaque page de livre :
+
+### Fonctionnement du spider details_book
+
+1. **Lecture du JSON** : Lit le fichier `books_by_categories.json` pour récupérer les URLs des livres
+2. **Visite individuelle** : Visite chaque page de livre pour extraire les détails complets
+3. **Extraction enrichie** : Collecte toutes les informations disponibles (description, tableau de détails, etc.)
+4. **Variables en français** : Toutes les variables sont nommées en français
+
+### Commandes pour le spider des détails
+
+**PRÉREQUIS IMPORTANT** : Ce spider nécessite le fichier `books_by_categories.json`.
+
+```bash
+# ÉTAPE 1: Générer d'abord les livres par catégorie
+cd books_toscrape
+scrapy crawl books_by_categories_spider -o books_by_categories.json
+
+# ÉTAPE 2: Extraire les détails complets de chaque livre (sauvegarde automatique)
+cd books_toscrape
+scrapy crawl details_book_spider
+
+# Le fichier detail_books.json est créé/mis à jour automatiquement
+# Pas besoin de spécifier -o, la sauvegarde est intégrée au spider
+```
+
+### Données extraites par details_book
+
+- **url_page** : URL de la page du livre
+- **categorie** : Catégorie du livre (extraite depuis le breadcrumb)
+- **titre** : Titre complet du livre
+- **prix_original** : Prix avec symbole de devise
+- **prix_numerique** : Prix converti en nombre
+- **note_etoiles** : Note en nombre (1-5)
+- **disponibilite** : Information de disponibilité complète
+- **nombre_stock** : Nombre d'articles en stock (extrait de la disponibilité)
+- **description** : Description complète du livre
+- **url_image** : URL de l'image haute résolution
+- **fil_ariane** : Chemin de navigation (breadcrumb)
+- **code_upc** : Code produit unique
+- **type_produit** : Type de produit
+- **prix_hors_taxe** : Prix hors taxes
+- **prix_avec_taxe** : Prix taxes comprises
+- **taxe** : Montant des taxes
+- **nombre_avis** : Nombre d'avis clients
+- **livres_recommandes** : Liste des livres similaires (exclut les produits consultés)
+
+### Commandes combinées complètes
+
+```bash
+# Processus complet : catégories → livres par catégorie → détails
+cd books_toscrape
+scrapy crawl categories_spider -o categories.json && scrapy crawl books_by_categories_spider -o books_by_categories.json && scrapy crawl details_book_spider -o details_livres.json
+```
+
+### Performance et utilisation
+
+**Note importante** : Ce spider visite CHAQUE page de livre individuellement (1000+ pages). L'exécution peut prendre 15-30 minutes selon la configuration réseau.
+
+### Exemple de données détaillées extraites
+
+```json
+{
+  "url_page": "https://books.toscrape.com/catalogue/sharp-objects_997/index.html",
+  "categorie": "Mystery",
+  "titre": "Sharp Objects",
+  "prix_original": "£47.82",
+  "prix_numerique": 47.82,
+  "note_etoiles": 4,
+  "disponibilite": "In stock (20 available)",
+  "nombre_stock": 20,
+  "description": "WICKED above her hipbone, GIRL across her heart...",
+  "url_image": "https://books.toscrape.com/media/cache/32/51/...",
+  "fil_ariane": ["Home", "Books", "Mystery"],
+  "code_upc": "90fa61229261140a",
+  "type_produit": "Books",
+  "prix_hors_taxe": "47.82",
+  "prix_avec_taxe": "47.82",
+  "taxe": "0.00",
+  "nombre_avis": "0",
+  "livres_recommandes": ["The Girl with the Dragon Tattoo", "Gone Girl"]
+}
+```
+
+## API FastAPI - Serveur de données
+
+Ce projet intègre un serveur FastAPI pour exposer les données scrapées via une API REST moderne et performante.
+
+### Installation des dépendances FastAPI
+
+```bash
+# Installer FastAPI et Uvicorn (serveur ASGI)
+pip install fastapi uvicorn python-multipart
+```
+
+### Lancement du serveur FastAPI
+
+```bash
+# Lancer le serveur de développement avec rechargement automatique
+# Le serveur sera accessible sur http://localhost:8000
+uvicorn main:app --reload
+
+# Lancer le serveur en production sur un port spécifique
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# Lancer le serveur avec des workers multiples (production)
+uvicorn main:app --workers 4
+```
+
+### Endpoints API disponibles
+
+L'API FastAPI fournit les endpoints suivants pour accéder aux données scrapées :
+
+```bash
+# Documentation interactive Swagger UI
+http://localhost:8000/docs
+
+# Documentation ReDoc alternative
+http://localhost:8000/redoc
+
+# API Schema OpenAPI
+http://localhost:8000/openapi.json
+```
+
+### Fonctionnalités de l'API
+
+- **CRUD complet** : Création, lecture, mise à jour et suppression des données de livres
+- **Filtrage avancé** : Recherche par catégorie, prix, note, disponibilité
+- **Pagination** : Navigation efficace dans les grandes collections de données
+- **Validation automatique** : Validation des données entrantes avec Pydantic
+- **Documentation interactive** : Interface Swagger UI intégrée
+- **Support JSON** : Lecture et écriture des fichiers JSON générés par Scrapy
+
+### Sources de données
+
+L'API FastAPI lit et manipule les fichiers JSON suivants générés par les spiders Scrapy :
+
+- `books_toscrape/categories.json` : Données des catégories de livres
+- `books_toscrape/books_by_categories.json` : Livres organisés par catégorie
+- `books_toscrape/detail_books.json` : Détails complets de chaque livre
+- `books_toscrape/mydara.json` : Données personnalisées
+
+### Exemples d'utilisation de l'API
+
+```bash
+# Récupérer tous les livres
+curl http://localhost:8000/books
+
+# Récupérer un livre par ID
+curl http://localhost:8000/books/1
+
+# Récupérer les livres d'une catégorie
+curl http://localhost:8000/books/category/Mystery
+
+# Rechercher des livres par prix
+curl "http://localhost:8000/books?price_min=10&price_max=50"
+
+# Récupérer les statistiques
+curl http://localhost:8000/stats
+```
 ```

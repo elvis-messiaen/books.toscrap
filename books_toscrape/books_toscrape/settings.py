@@ -58,9 +58,10 @@ DOWNLOAD_DELAY = 1
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    "books_toscrape.pipelines.BooksToscrapePipeline": 300,
-#}
+ITEM_PIPELINES = {
+    "books_toscrape.pipelines.BooksToscrapePipeline": 300,
+    "books_toscrape.pipelines.DetailsBooksUpdatePipeline": 400,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
