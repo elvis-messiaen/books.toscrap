@@ -21,21 +21,22 @@ class BookRepository(BookRepositoryInterface):
     def charger_donnees_livres(self) -> None:
         """
         Charger les données des livres depuis les fichiers JSON de Scrapy.
+        Priorité: books_by_categories.json (complet) puis detail_books.json si nécessaire.
         """
         try:
-            # Charger d'abord detail_books.json (données les plus complètes)
-            detail_books_path = os.path.join(self.base_path, "detail_books.json")
-            if os.path.exists(detail_books_path):
-                with open(detail_books_path, 'r', encoding='utf-8') as f:
+            # Charger d'abord books_by_categories.json (données complètes avec tous les livres)
+            books_categories_path = os.path.join(self.base_path, "books_by_categories.json")
+            if os.path.exists(books_categories_path):
+                with open(books_categories_path, 'r', encoding='utf-8') as f:
                     json_data = json.load(f)
                     self.books = [self.convertir_json_vers_book(item, index + 1)
                                  for index, item in enumerate(json_data)]
                     return
 
-            # Si pas de détails, charger books_by_categories.json
-            books_categories_path = os.path.join(self.base_path, "books_by_categories.json")
-            if os.path.exists(books_categories_path):
-                with open(books_categories_path, 'r', encoding='utf-8') as f:
+            # Si pas de books_by_categories, charger detail_books.json
+            detail_books_path = os.path.join(self.base_path, "detail_books.json")
+            if os.path.exists(detail_books_path):
+                with open(detail_books_path, 'r', encoding='utf-8') as f:
                     json_data = json.load(f)
                     self.books = [self.convertir_json_vers_book(item, index + 1)
                                  for index, item in enumerate(json_data)]
@@ -55,15 +56,30 @@ class BookRepository(BookRepositoryInterface):
         Returns:
             Book: L'objet Book créé
         """
+        # Debug: Récupération sécurisée de la catégorie
+        categorie = json_data.get('categorie') or json_data.get('category', '')
+
+        # Debug: Gestion robuste des prix
+        try:
+            prix = float(json_data.get('prix_numerique', json_data.get('price', 0.0)))
+        except (ValueError, TypeError):
+            prix = 0.0
+
+        # Debug: Gestion robuste des notes
+        try:
+            note = int(json_data.get('note_etoiles', json_data.get('star_rating', 0)))
+        except (ValueError, TypeError):
+            note = 0
+
         return Book(
             id=json_data.get('id', book_id),
             url_page=json_data.get('url_page', json_data.get('url', '')),
-            categorie=json_data.get('categorie', json_data.get('category', '')),
+            categorie=categorie,
             title=json_data.get('titre', json_data.get('title', '')),
-            prix_numerique=float(json_data.get('prix_numerique', 0.0)),
-            note_etoiles_nombre=int(json_data.get('note_etoiles', 0)),
-            nombre_avis_clients=int(json_data.get('nombre_avis', 0)),
-            en_stock=json_data.get('disponibilite', '').lower().startswith('in stock'),
+            prix_numerique=prix,
+            note_etoiles_nombre=note,
+            nombre_avis_clients=int(json_data.get('nombre_avis', json_data.get('reviews', 0))),
+            en_stock='in stock' in json_data.get('disponibilite', json_data.get('availability', '')).lower(),
             nombre_stock=int(json_data.get('nombre_stock', 0)),
             description=json_data.get('description', ''),
             url_image=json_data.get('url_image', json_data.get('image_url', '')),

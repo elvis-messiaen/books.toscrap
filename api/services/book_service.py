@@ -1,7 +1,9 @@
 from typing import List, Optional
 from api.interfaces.book_service_interface import BookServiceInterface
-from api.repositories.book_repository import BookRepository
+from api.repositories.book_repository_sql import BookRepositorySQL
 from api.models.book import Book
+from api.models.prix_moyen_categorie import PrixMoyenCategorie
+from api.models.top_categorie import TopCategorie
 
 
 class BookService(BookServiceInterface):
@@ -14,7 +16,7 @@ class BookService(BookServiceInterface):
         """
         Initialiser le service avec une instance de BookRepository.
         """
-        self.book_repository = BookRepository()
+        self.book_repository = BookRepositorySQL()
 
     def get_all_books(self) -> List[Book]:
         """
@@ -43,68 +45,8 @@ class BookService(BookServiceInterface):
 
         return self.book_repository.get_book_by_id(book_id)
 
-    def create_book(self, book_data: Book) -> Book:
-        """
-        Créer un nouveau livre avec validation métier.
 
-        Args:
-            book_data: Les données du livre à créer
 
-        Returns:
-            Book: Le livre créé
-
-        Raises:
-            ValueError: Si les données sont invalides
-        """
-        # Validation métier
-        self.valider_livre(book_data)
-
-        # Sauvegarder via le repository
-        return self.book_repository.save_book(book_data)
-
-    def update_book(self, book_id: int, book_data: Book) -> Optional[Book]:
-        """
-        Mettre à jour un livre existant avec validation.
-
-        Args:
-            book_id: L'ID du livre à mettre à jour
-            book_data: Les nouvelles données du livre
-
-        Returns:
-            Optional[Book]: Le livre mis à jour ou None
-
-        Raises:
-            ValueError: Si les données sont invalides
-        """
-        if book_id <= 0:
-            raise ValueError("L'ID du livre doit être un nombre positif")
-
-        # Vérifier que le livre existe
-        if not self.book_repository.get_book_by_id(book_id):
-            return None
-
-        # Validation métier
-        self.valider_livre(book_data)
-
-        return self.book_repository.update_book(book_id, book_data)
-
-    def delete_book(self, book_id: int) -> bool:
-        """
-        Supprimer un livre par son ID avec vérifications.
-
-        Args:
-            book_id: L'ID du livre à supprimer
-
-        Returns:
-            bool: True si supprimé, False sinon
-
-        Raises:
-            ValueError: Si l'ID est invalide
-        """
-        if book_id <= 0:
-            raise ValueError("L'ID du livre doit être un nombre positif")
-
-        return self.book_repository.delete_book(book_id)
 
     def find_by_category(self, category: str) -> List[Book]:
         """
@@ -127,24 +69,78 @@ class BookService(BookServiceInterface):
 
         return self.book_repository.find_by_category(category)
 
-    def valider_livre(self, book: Book) -> None:
+    def calculer_prix_moyen_par_categorie(self) -> List[PrixMoyenCategorie]:
         """
-        Valider les données d'un livre selon les règles métier.
+        Calculer le prix moyen des livres par catégorie.
 
-        Args:
-            book: Le livre à valider
-
-        Raises:
-            ValueError: Si les données sont invalides
+        Returns:
+            List[PrixMoyenCategorie]: Liste des prix moyens par catégorie
         """
-        # Validation du titre
-        if not book.title or not book.title.strip():
-            raise ValueError("Le titre est obligatoire")
+        tous_les_livres = self.book_repository.get_all_books()
 
-        # Validation du prix
-        if book.prix_numerique < 0:
-            raise ValueError("Le prix ne peut pas être négatif")
+        # Dictionnaire pour regrouper par catégorie
+        categories_dict = {}
 
-        # Validation de la note
-        if book.note_etoiles_nombre and not 1 <= book.note_etoiles_nombre <= 5:
-            raise ValueError("La note doit être entre 1 et 5")
+        for livre in tous_les_livres:
+            if livre.categorie and livre.prix_numerique > 0:
+                if livre.categorie not in categories_dict:
+                    categories_dict[livre.categorie] = {
+                        'total_prix': 0.0,
+                        'nombre_livres': 0
+                    }
+
+                categories_dict[livre.categorie]['total_prix'] += livre.prix_numerique
+                categories_dict[livre.categorie]['nombre_livres'] += 1
+
+        # Calculer les prix moyens
+        resultats = []
+        for categorie, data in categories_dict.items():
+            if data['nombre_livres'] > 0:
+                prix_moyen = round(data['total_prix'] / data['nombre_livres'], 2)
+                resultats.append(PrixMoyenCategorie(
+                    categorie=categorie,
+                    prix_moyen=prix_moyen,
+                    nombre_livres=data['nombre_livres']
+                ))
+
+        # Trier par prix moyen décroissant
+        resultats.sort(key=lambda x: x.prix_moyen, reverse=True)
+        return resultats
+
+    def obtenir_top_categories_par_nombre_livres(self) -> List[TopCategorie]:
+        """
+        Obtenir le classement des catégories par nombre de livres.
+
+        Returns:
+            List[TopCategorie]: Liste des catégories classées par nombre de livres décroissant
+        """
+        tous_les_livres = self.book_repository.get_all_books()
+
+        # Dictionnaire pour compter les livres par catégorie
+        categories_count = {}
+
+        for livre in tous_les_livres:
+            if livre.categorie:
+                if livre.categorie not in categories_count:
+                    categories_count[livre.categorie] = 0
+                categories_count[livre.categorie] += 1
+
+        # Trier par nombre de livres décroissant
+        categories_triees = sorted(categories_count.items(), key=lambda x: x[1], reverse=True)
+
+        # Calculer le total pour les pourcentages
+        total_livres = sum(categories_count.values())
+
+        # Créer le classement avec rang
+        resultats = []
+        for rang, (categorie, nombre_livres) in enumerate(categories_triees, 1):
+            pourcentage = round((nombre_livres / total_livres) * 100, 2) if total_livres > 0 else 0.0
+
+            resultats.append(TopCategorie(
+                rang=rang,
+                categorie=categorie,
+                nombre_livres=nombre_livres,
+                pourcentage_total=pourcentage
+            ))
+
+        return resultats

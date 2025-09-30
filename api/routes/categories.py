@@ -2,9 +2,13 @@
 from typing import List
 from fastapi import APIRouter, HTTPException
 from api.services.category_service import CategoryService
+from api.services.book_service import BookService
+from api.models.prix_moyen_categorie import PrixMoyenCategorie
+from api.models.top_categorie import TopCategorie
 
 router = APIRouter()
 category_service = CategoryService()
+book_service = BookService()
 
 
 @router.get("/")
@@ -30,40 +34,31 @@ def obtenir_categorie_par_id(category_id: int):
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 
-@router.post("/")
-def creer_categorie(categorie: dict):
-    """Creer une nouvelle categorie."""
+@router.get("/prix-moyen/", response_model=List[PrixMoyenCategorie])
+def obtenir_prix_moyen_par_categorie():
+    """
+    Calculer et retourner le prix moyen des livres par catégorie.
+
+    Returns:
+        List[PrixMoyenCategorie]: Liste des catégories avec leur prix moyen,
+                                  nombre de livres, triée par prix décroissant
+    """
     try:
-        return category_service.create_category(categorie)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return book_service.calculer_prix_moyen_par_categorie()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 
-@router.put("/{category_id}")
-def modifier_categorie(category_id: int, categorie: dict):
-    """Mettre a jour une categorie existante."""
-    try:
-        categorie_modifiee = category_service.update_category(category_id, categorie)
-        if not categorie_modifiee:
-            raise HTTPException(status_code=404, detail="Categorie non trouvee")
-        return categorie_modifiee
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+@router.get("/top-nombre-livres/", response_model=List[TopCategorie])
+def obtenir_top_categories_par_nombre_livres():
+    """
+    Obtenir le classement des catégories par nombre de livres.
 
-
-@router.delete("/{category_id}")
-def supprimer_categorie(category_id: int):
-    """Supprimer une categorie par son ID."""
+    Returns:
+        List[TopCategorie]: Liste des catégories classées par nombre de livres décroissant,
+                           avec rang, nombre de livres et pourcentage du total
+    """
     try:
-        supprime = category_service.delete_category(category_id)
-        if not supprime:
-            raise HTTPException(status_code=404, detail="Categorie non trouvee")
-        return {"message": f"Categorie {category_id} supprimee avec succes"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return book_service.obtenir_top_categories_par_nombre_livres()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")

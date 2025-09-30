@@ -2,38 +2,42 @@ from abc import ABC, abstractmethod
 
 
 class CategoryRepositoryInterface(ABC):
+    """
+    Interface definissant les operations de lecture seule pour les categories.
+    """
 
-    """
-    Recupérer toutes les catégories
-    """
     @abstractmethod
     def get_all_categories(self) -> list[dict]:
+        """
+        Recuperer toutes les categories.
+
+        Returns:
+            list[dict]: Liste de toutes les categories
+        """
         pass
 
-    """
-    Recupérer une catégorie par son ID
-    """
     @abstractmethod
     def get_category_by_id(self, category_id: int) -> dict:
+        """
+        Recuperer une categorie par son ID.
+
+        Args:
+            category_id: L'ID de la categorie a recuperer
+
+        Returns:
+            dict: La categorie trouvee ou None
+        """
         pass
 
-    """
-    Sauvegarder une nouvelle catégorie
-    """
     @abstractmethod
     def save_category(self, category: dict) -> dict:
-        pass
+        """
+        Sauvegarder une nouvelle categorie.
 
-    """
-    Mettre à jour une catégorie existante
-    """
-    @abstractmethod
-    def update_category(self, category_id: int, category: dict) -> dict:
-        pass
+        Args:
+            category: La categorie a sauvegarder
 
-    """
-    Supprimer une catégorie par son ID
-    """
-    @abstractmethod
-    def delete_category(self, category_id: int) -> bool:
+        Returns:
+            dict: La categorie sauvegardee avec son ID
+        """
         pass

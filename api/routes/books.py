@@ -31,45 +31,6 @@ def obtenir_livre_par_id(book_id: int):
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 
-@router.post("/", response_model=Book)
-def creer_livre(livre: Book):
-    """Creer un nouveau livre."""
-    try:
-        return book_service.create_book(livre)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
-
-
-@router.put("/{book_id}", response_model=Book)
-def modifier_livre(book_id: int, livre: Book):
-    """Mettre a jour un livre existant."""
-    try:
-        livre_modifie = book_service.update_book(book_id, livre)
-        if not livre_modifie:
-            raise HTTPException(status_code=404, detail="Livre non trouve")
-        return livre_modifie
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
-
-
-@router.delete("/{book_id}")
-def supprimer_livre(book_id: int):
-    """Supprimer un livre par son ID."""
-    try:
-        supprime = book_service.delete_book(book_id)
-        if not supprime:
-            raise HTTPException(status_code=404, detail="Livre non trouve")
-        return {"message": f"Livre {book_id} supprime avec succes"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
-
-
 @router.get("/category/{category_name}", response_model=List[Book])
 def obtenir_livres_par_categorie(category_name: str):
     """Recuperer tous les livres d'une categorie."""

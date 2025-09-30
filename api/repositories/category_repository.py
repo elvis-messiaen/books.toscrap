@@ -50,19 +50,4 @@ class CategoryRepository(CategoryRepositoryInterface):
         self.categories_data.append(category)
         return category
 
-    def update_category(self, category_id: int, category_data: dict) -> Optional[dict]:
-        """Mettre a jour une categorie existante."""
-        for index, category in enumerate(self.categories_data):
-            if category.get('id') == category_id:
-                category_data['id'] = category_id
-                self.categories_data[index] = category_data
-                return category_data
-        return None
 
-    def delete_category(self, category_id: int) -> bool:
-        """Supprimer une categorie par son ID."""
-        for index, category in enumerate(self.categories_data):
-            if category.get('id') == category_id:
-                del self.categories_data[index]
-                return True
-        return False

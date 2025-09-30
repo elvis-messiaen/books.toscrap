@@ -2,39 +2,30 @@ from abc import ABC, abstractmethod
 
 
 class CategoryServiceInterface(ABC):
+    """
+    Interface definissant les operations de lecture seule pour les categories.
+    """
 
-    """
-    récupérer toutes les catégories
-    """
     @abstractmethod
     def get_all_categories(self) -> list[dict]:
+        """
+        Recuperer toutes les categories.
+
+        Returns:
+            list[dict]: Liste de toutes les categories
+        """
         pass
 
-    """
-    récupérer une catégorie par son ID
-    """
     @abstractmethod
     def get_category_by_id(self, category_id: int) -> dict:
-        pass
+        """
+        Recuperer une categorie par son ID.
 
-    """
-    créer une nouvelle catégorie avec validation métier
-    """
-    @abstractmethod
-    def create_category(self, category_data: dict) -> dict:
-        pass
+        Args:
+            category_id: L'ID de la categorie a recuperer
 
-    """
-    mettre à jour une catégorie existante
-    """
-    @abstractmethod
-    def update_category(self, category_id: int, category_data: dict) -> dict:
-        pass
-
-    """
-    supprimer une catégorie par son ID
-    """
-    @abstractmethod
-    def delete_category(self, category_id: int) -> bool:
+        Returns:
+            dict: La categorie trouvee ou None
+        """
         pass
 
