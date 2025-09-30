@@ -9,6 +9,7 @@ PRÉREQUIS: Exécuter d'abord "scrapy crawl books_by_categories_spider -o books_
 import scrapy
 import json
 import os
+from urllib.parse import quote
 
 from ..items import BookDetailsProduct
 from ..itemloaders import BookDetailsLoader 
@@ -30,6 +31,13 @@ class DetailsBookSpider(scrapy.Spider):
         Initialise le spider (sauvegarde gérée par le pipeline)
         """
         super().__init__()
+
+        # Compteur pour limiter à exactement 1000 livres
+        self.livres_traites = 0
+        self.limite_livres = 1000
+
+        # Nettoie automatiquement la BDD avant de commencer
+        self.nettoyer_base_donnees()
 
 
     def start_requests(self):
@@ -65,13 +73,15 @@ class DetailsBookSpider(scrapy.Spider):
                 url_livre = livre.get('url')
 
                 if url_livre:
-                    # FORCE le traitement de TOUTES les URLs pour permettre les mises à jour
+                    # Utilisation directe de l'URL sans encodage pour éviter les doublons
                     yield scrapy.Request(
                         url=url_livre,
                         callback=self.parse_details_livre,
+                        errback=self.gerer_erreur_requete,
                         meta={
                             'categorie_originale': livre.get('category', 'Inconnue'),
-                            'titre_original': livre.get('title', 'Inconnu')
+                            'titre_original': livre.get('title', 'Inconnu'),
+                            'url_originale': url_livre
                         }
                     )
 
@@ -94,6 +104,11 @@ class DetailsBookSpider(scrapy.Spider):
         Yields:
             dict: Données complètes du livre avec tous les détails
         """
+        # Vérifier la limite de livres traités
+        if self.livres_traites >= self.limite_livres:
+            self.logger.info(f"Limite de {self.limite_livres} livres atteinte - Arrêt du spider")
+            self.crawler.engine.close_spider(self, f'Limite de {self.limite_livres} livres atteinte')
+            return
         # Récupère les métadonnées transmises (comme fallback)
         categorie_meta = response.meta.get('categorie_originale', 'Inconnue')
         titre_original = response.meta.get('titre_original', 'Inconnu')
@@ -182,7 +197,18 @@ class DetailsBookSpider(scrapy.Spider):
         for cle, valeur in details_tableau_complet.items():
             loader.add_value(cle, valeur)
 
+        # Vérification du statut de réponse
+        if response.status != 200:
+            self.logger.error(
+                f"Erreur HTTP {response.status} pour l'URL: {response.url} "
+                f"(Titre: {titre_original})"
+            )
+            return
+
         resultat_complet = loader.load_item()
+
+        # Log de succès pour le suivi
+        self.logger.info(f"Livre traité avec succès: {titre or titre_original}")
 
         yield resultat_complet
 
@@ -430,3 +456,54 @@ class DetailsBookSpider(scrapy.Spider):
             if devise in prix_texte:
                 return devise
         return ''
+
+    def gerer_erreur_requete(self, failure):
+        """
+        Gère les erreurs de requête pour identifier les URLs problématiques
+
+        Args:
+            failure: Objet d'échec de la requête
+        """
+        url_originale = failure.request.meta.get('url_originale', 'URL inconnue')
+        titre_original = failure.request.meta.get('titre_original', 'Titre inconnu')
+
+        self.logger.error(
+            f"ERREUR DE REQUÊTE - Livre: '{titre_original}' | "
+            f"URL originale: {url_originale} | "
+            f"URL encodée: {failure.request.url} | "
+            f"Erreur: {failure.value}"
+        )
+
+        # Suppression du système de retry pour éviter les doublons
+
+    def nettoyer_base_donnees(self):
+        """
+        Nettoie automatiquement la base de données avant le scraping
+        """
+        try:
+            import sys
+            import os
+
+            # Ajouter le répertoire racine au chemin
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+
+            from database_config import engine
+            from sqlalchemy import text
+
+            with engine.connect() as connection:
+                # Supprimer tous les enregistrements
+                result = connection.execute(text("DELETE FROM books"))
+                connection.commit()
+
+                # Remettre l'auto-increment à 1
+                connection.execute(text("ALTER SEQUENCE books_id_seq RESTART WITH 1"))
+                connection.commit()
+
+                self.logger.info(f"Base de données nettoyée - {result.rowcount} enregistrements supprimés")
+                self.logger.info("Prêt pour un scraping propre avec IDs séquentiels !")
+
+        except Exception as e:
+            self.logger.warning(f"Impossible de nettoyer la BDD: {e}")
+            self.logger.info("Le scraping va continuer sans nettoyage automatique")

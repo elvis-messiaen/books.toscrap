@@ -60,7 +60,10 @@ DOWNLOAD_DELAY = 1
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     "books_toscrape.pipelines.BooksToscrapePipeline": 300,
-    "books_toscrape.pipelines.DetailsBooksUpdatePipeline": 400,
+    # Pipeline PostgreSQL pour sauvegarde directe en BDD
+    "books_toscrape.pipelines.PostgreSQLPipeline": 400,
+    # Pipeline JSON réactivé pour double sauvegarde
+    "books_toscrape.pipelines.DetailsBooksUpdatePipeline": 500,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -86,3 +89,13 @@ ITEM_PIPELINES = {
 
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
+
+# Désactiver les retry pour éviter les requêtes supplémentaires
+RETRY_ENABLED = False
+RETRY_TIMES = 0
+
+# Désactiver les redirections automatiques
+REDIRECT_ENABLED = False
+
+# Activer le dupefilter strict pour éviter les doublons
+DUPEFILTER_DEBUG = True
